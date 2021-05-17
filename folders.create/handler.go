@@ -6,9 +6,9 @@ import (
 	"thin-peak/logs/logger"
 
 	"github.com/big-larry/mgo"
+	"github.com/big-larry/mgo/bson"
 	"github.com/big-larry/suckhttp"
 	"github.com/rs/xid"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type CreateFolder struct {
@@ -78,10 +78,10 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	//
 
 	// check root meta ?????
-	selector := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
 	var foo interface{}
 
-	err = conf.mgoColl.Find(selector).One(&foo)
+	err = conf.mgoColl.Find(query).One(&foo)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			return suckhttp.NewResponse(403, "Forbidden"), nil

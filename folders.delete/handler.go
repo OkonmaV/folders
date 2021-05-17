@@ -6,8 +6,8 @@ import (
 	"thin-peak/logs/logger"
 
 	"github.com/big-larry/mgo"
+	"github.com/big-larry/mgo/bson"
 	"github.com/big-larry/suckhttp"
-	"go.mongodb.org/mongo-driver/bson"
 )
 
 type DeleteFolder struct {
@@ -71,7 +71,7 @@ func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	metaid := "randmetaid"
 	//
 
-	selector := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
 
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"deleted.bymeta": metaid}, "$currentDate": bson.M{"deleted.date": true}},
@@ -82,7 +82,7 @@ func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 
 	var foo interface{}
 
-	_, err = conf.mgoColl.Find(selector).Apply(change, &foo)
+	_, err = conf.mgoColl.Find(query).Apply(change, &foo)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			return suckhttp.NewResponse(403, "Forbidden"), nil
