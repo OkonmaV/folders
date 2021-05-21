@@ -47,11 +47,6 @@ func (conf *MetaChange) Close() error {
 
 func (conf *MetaChange) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
-	cookie, ok := r.GetCookie("koki")
-	if cookie == "" || !ok { // TODO: нужна ли проверка на "" ?
-		return suckhttp.NewResponse(401, "Unauthorized"), nil
-	}
-
 	// TODO: AUTH
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
@@ -68,24 +63,21 @@ func (conf *MetaChange) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp
 	if fid == "" || fnewmeta == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
-	// TODO: get metauser
-	metaid := "randmetaid"
-	// 
 
-	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
-		Update:    bson.M{"$addToSet": bson.M{"metas":&meta{Type: ,Id :fid  }}},// TODO: types
+		Update:    bson.M{"$addToSet": bson.M{"metas": &meta{Type: 1, Id: fid}}},
 		Upsert:    false,
 		ReturnNew: true,
 		Remove:    false,
-	}                                                                                                                                                                                                                                                        
+	}
 	var foo interface{}
 
 	_, err = conf.mgoColl.Find(query).Apply(change, &foo)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return suckhttp.NewResponse(403, "Forbidden"), nil
+			return suckhttp.NewResponse(400, "Bad request"), nil
 		}
 		return nil, err
 	}

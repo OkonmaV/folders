@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"lib"
 	"thin-peak/httpservice"
 )
 
@@ -12,6 +11,8 @@ type config struct {
 	MgoAddr      string
 	MgoColl      string
 }
+
+var thisServiceName httpservice.ServiceName = "conf.createfolder"
 
 func (c *config) GetListenAddress() string {
 	return c.Listen
@@ -25,5 +26,5 @@ func (c *config) CreateHandler(ctx context.Context, connectors map[httpservice.S
 }
 
 func main() {
-	httpservice.InitNewService(lib.ServiceNameCreateChat, false, 5, &config{}, lib.ServiceNameCookieTokenGen)
+	httpservice.InitNewService(thisServiceName, false, 5, &config{})
 }

@@ -47,11 +47,6 @@ func (conf *RenameFolder) Close() error {
 
 func (conf *RenameFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
-	cookie, ok := r.GetCookie("koki")
-	if cookie == "" || !ok { // TODO: нужна ли проверка на "" ?
-		return suckhttp.NewResponse(401, "Unauthorized"), nil
-	}
-
 	// TODO: AUTH
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
@@ -68,11 +63,8 @@ func (conf *RenameFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	if fid == "" || fnewname == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
-	// TODO: get metauser
-	metaid := "randmetaid"
-	//
 
-	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
 		Update:    bson.M{"$set": bson.M{"name": fnewname}},

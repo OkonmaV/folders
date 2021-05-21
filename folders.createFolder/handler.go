@@ -16,10 +16,10 @@ type CreateFolder struct {
 	mgoColl    *mgo.Collection
 }
 type folder struct {
-	Id    string   `bson:"_id"`
-	Roots []string `bson:"users"`
-	Name  string   `bson:"name"`
-	Metas []meta   `bson:"type"`
+	Id      string   `bson:"_id"`
+	RootsId []string `bson:"rootsid"`
+	Name    string   `bson:"name"`
+	Metas   []meta   `bson:"metas"`
 }
 
 type meta struct {
@@ -34,7 +34,7 @@ func NewCreateFolder(mgoAddr string, mgoColl string) (*CreateFolder, error) {
 		logger.Error("Mongo conn", err)
 		return nil, err
 	}
-
+	logger.Info("Mongo", "Connected!")
 	mgoCollection := mgoSession.DB("main").C(mgoColl)
 
 	return &CreateFolder{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
@@ -52,11 +52,6 @@ func getRandId() string {
 
 func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
-	cookie, ok := r.GetCookie("koki")
-	if cookie == "" || !ok { // TODO: нужна ли проверка на "" ?
-		return suckhttp.NewResponse(401, "Unauthorized"), nil
-	}
-
 	// TODO: AUTH
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
@@ -68,7 +63,7 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 		return suckhttp.NewResponse(400, "Bad Request"), err
 	}
 
-	froot := formValues.Get("froot")
+	froot := formValues.Get("frootid")
 	fname := formValues.Get("fname")
 	if froot == "" || fname == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
@@ -77,8 +72,21 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	metaid := "randmetaid"
 	//
 
-	// check root meta ?????
-	query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	// // check root meta ?????
+	// query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	// var foo interface{}
+
+	// err = conf.mgoColl.Find(query).One(&foo)
+	// if err != nil {
+	// 	if err == mgo.ErrNotFound {
+	// 		return suckhttp.NewResponse(403, "Forbidden"), nil
+	// 	}
+	// 	return nil, err
+	// }
+	// //
+
+	// cheking root
+	query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}}
 	var foo interface{}
 
 	err = conf.mgoColl.Find(query).One(&foo)
@@ -88,9 +96,8 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 		}
 		return nil, err
 	}
-	//
 
-	finsert := &folder{Id: getRandId(), Roots: []string{froot}, Name: fname, Metas: []meta{{Type: 0, Id: metaid}}}
+	finsert := &folder{Id: getRandId(), RootsId: []string{froot}, Name: fname, Metas: []meta{{Type: 0, Id: metaid}}}
 
 	err = conf.mgoColl.Insert(finsert)
 	if err != nil {

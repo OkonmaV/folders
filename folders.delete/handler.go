@@ -15,10 +15,10 @@ type DeleteFolder struct {
 	mgoColl    *mgo.Collection
 }
 type folder struct {
-	Id    string   `bson:"_id"`
-	Roots []string `bson:"users"`
-	Name  string   `bson:"name"`
-	Metas []meta   `bson:"type"`
+	Id      string   `bson:"_id"`
+	RootsId []string `bson:"rootsid"`
+	Name    string   `bson:"name"`
+	Metas   []meta   `bson:"metas"`
 }
 
 type meta struct {
@@ -33,6 +33,7 @@ func NewDeleteFolder(mgoAddr string, mgoColl string) (*DeleteFolder, error) {
 		logger.Error("Mongo conn", err)
 		return nil, err
 	}
+	logger.Info("Mongo", "Connected!")
 
 	mgoCollection := mgoSession.DB("main").C(mgoColl)
 
@@ -46,11 +47,6 @@ func (conf *DeleteFolder) Close() error {
 }
 
 func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
-
-	cookie, ok := r.GetCookie("koki")
-	if cookie == "" || !ok { // TODO: нужна ли проверка на "" ?
-		return suckhttp.NewResponse(401, "Unauthorized"), nil
-	}
 
 	// TODO: AUTH
 
