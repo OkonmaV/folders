@@ -10,44 +10,32 @@ import (
 	"github.com/big-larry/suckhttp"
 )
 
-type MetaChange struct {
+type RenameFolder struct {
 	mgoSession *mgo.Session
 	mgoColl    *mgo.Collection
 }
-type folder struct {
-	Id    string   `bson:"_id"`
-	Roots []string `bson:"users"`
-	Name  string   `bson:"name"`
-	Metas []meta   `bson:"type"`
-}
 
-type meta struct {
-	Type int    `bson:"metatype"`
-	Id   string `bson:"metaid"`
-}
-
-func NewMetaChange(mgoAddr string, mgoColl string) (*MetaChange, error) {
+func NewRenameFolder(mgodb string, mgoAddr string, mgoColl string) (*RenameFolder, error) {
 
 	mgoSession, err := mgo.Dial(mgoAddr)
 	if err != nil {
 		logger.Error("Mongo conn", err)
 		return nil, err
 	}
+	logger.Info("Mongo", "Connected!")
 
-	mgoCollection := mgoSession.DB("main").C(mgoColl)
+	mgoCollection := mgoSession.DB(mgodb).C(mgoColl)
 
-	return &MetaChange{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
+	return &RenameFolder{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
 
 }
 
-func (conf *MetaChange) Close() error {
+func (conf *RenameFolder) Close() error {
 	conf.mgoSession.Close()
 	return nil
 }
 
-func (conf *MetaChange) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
-
-	// TODO: AUTH
+func (conf *RenameFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
 		return suckhttp.NewResponse(400, "Bad request"), nil
@@ -59,25 +47,26 @@ func (conf *MetaChange) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp
 	}
 
 	fid := formValues.Get("fid")
-	fnewmeta := formValues.Get("fnewmeta")
-	if fid == "" || fnewmeta == "" {
+	fnewname := formValues.Get("fnewname")
+	if fid == "" || fnewname == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
+
+	// TODO: AUTH
 
 	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
-		Update:    bson.M{"$addToSet": bson.M{"metas": &meta{Type: 1, Id: fid}}},
+		Update:    bson.M{"$set": bson.M{"name": fnewname}, "$currentDate": bson.M{"lastmodified": true}},
 		Upsert:    false,
 		ReturnNew: true,
 		Remove:    false,
 	}
-	var foo interface{}
 
-	_, err = conf.mgoColl.Find(query).Apply(change, &foo)
+	_, err = conf.mgoColl.Find(query).Apply(change, nil)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return suckhttp.NewResponse(400, "Bad request"), nil
+			return suckhttp.NewResponse(403, "Forbidden"), nil
 		}
 		return nil, err
 	}

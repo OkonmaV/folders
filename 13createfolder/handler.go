@@ -4,6 +4,7 @@ import (
 	"net/url"
 	"strings"
 	"thin-peak/logs/logger"
+	"time"
 
 	"github.com/big-larry/mgo"
 	"github.com/big-larry/mgo/bson"
@@ -16,10 +17,11 @@ type CreateFolder struct {
 	mgoColl    *mgo.Collection
 }
 type folder struct {
-	Id      string   `bson:"_id"`
-	RootsId []string `bson:"rootsid"`
-	Name    string   `bson:"name"`
-	Metas   []meta   `bson:"metas"`
+	Id           string    `bson:"_id"`
+	RootsId      []string  `bson:"rootsid"`
+	Name         string    `bson:"name"`
+	Metas        []meta    `bson:"metas"`
+	LastModified time.Time `bson:"lastmodified"`
 }
 
 type meta struct {
@@ -27,7 +29,7 @@ type meta struct {
 	Id   string `bson:"metaid"`
 }
 
-func NewCreateFolder(mgoAddr string, mgoColl string) (*CreateFolder, error) {
+func NewCreateFolder(mgodb string, mgoAddr string, mgoColl string) (*CreateFolder, error) {
 
 	mgoSession, err := mgo.Dial(mgoAddr)
 	if err != nil {
@@ -35,7 +37,7 @@ func NewCreateFolder(mgoAddr string, mgoColl string) (*CreateFolder, error) {
 		return nil, err
 	}
 	logger.Info("Mongo", "Connected!")
-	mgoCollection := mgoSession.DB("main").C(mgoColl)
+	mgoCollection := mgoSession.DB(mgodb).C(mgoColl)
 
 	return &CreateFolder{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
 
@@ -52,8 +54,6 @@ func getRandId() string {
 
 func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
-	// TODO: AUTH
-
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
@@ -68,24 +68,14 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	if froot == "" || fname == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
+
+	// TODO: AUTH
+
 	// TODO: get metauser
 	metaid := "randmetaid"
 	//
 
-	// // check root meta ?????
-	// query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
-	// var foo interface{}
-
-	// err = conf.mgoColl.Find(query).One(&foo)
-	// if err != nil {
-	// 	if err == mgo.ErrNotFound {
-	// 		return suckhttp.NewResponse(403, "Forbidden"), nil
-	// 	}
-	// 	return nil, err
-	// }
-	// //
-
-	// cheking root
+	// проверяем корень??? удел AUTH???
 	query := &bson.M{"_id": froot, "deleted": bson.M{"$exists": false}}
 	var foo interface{}
 
@@ -96,10 +86,9 @@ func (conf *CreateFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 		}
 		return nil, err
 	}
+	//
 
-	finsert := &folder{Id: getRandId(), RootsId: []string{froot}, Name: fname, Metas: []meta{{Type: 0, Id: metaid}}}
-
-	err = conf.mgoColl.Insert(finsert)
+	err = conf.mgoColl.Insert(&folder{Id: getRandId(), RootsId: []string{froot}, Name: fname, Metas: []meta{{Type: 0, Id: metaid}}, LastModified: time.Now()})
 	if err != nil {
 		return nil, err
 	}

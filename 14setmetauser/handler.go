@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 	"thin-peak/logs/logger"
 
@@ -10,15 +11,9 @@ import (
 	"github.com/big-larry/suckhttp"
 )
 
-type RenameFolder struct {
+type SetMetaUser struct {
 	mgoSession *mgo.Session
 	mgoColl    *mgo.Collection
-}
-type folder struct {
-	Id    string   `bson:"_id"`
-	Roots []string `bson:"users"`
-	Name  string   `bson:"name"`
-	Metas []meta   `bson:"type"`
 }
 
 type meta struct {
@@ -26,7 +21,7 @@ type meta struct {
 	Id   string `bson:"metaid"`
 }
 
-func NewRenameFolder(mgoAddr string, mgoColl string) (*RenameFolder, error) {
+func NewSetMetaUser(mgodb string, mgoAddr string, mgoColl string) (*SetMetaUser, error) {
 
 	mgoSession, err := mgo.Dial(mgoAddr)
 	if err != nil {
@@ -34,20 +29,18 @@ func NewRenameFolder(mgoAddr string, mgoColl string) (*RenameFolder, error) {
 		return nil, err
 	}
 
-	mgoCollection := mgoSession.DB("main").C(mgoColl)
+	mgoCollection := mgoSession.DB(mgodb).C(mgoColl)
 
-	return &RenameFolder{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
+	return &SetMetaUser{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
 
 }
 
-func (conf *RenameFolder) Close() error {
+func (conf *SetMetaUser) Close() error {
 	conf.mgoSession.Close()
 	return nil
 }
 
-func (conf *RenameFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
-
-	// TODO: AUTH
+func (conf *SetMetaUser) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
 		return suckhttp.NewResponse(400, "Bad request"), nil
@@ -59,33 +52,33 @@ func (conf *RenameFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	}
 
 	fid := formValues.Get("fid")
-	fnewname := formValues.Get("fnewname")
-	if fid == "" || fnewname == "" {
+	fnewmeta := formValues.Get("fnewmeta")
+	fnewmetatype, err := strconv.Atoi(formValues.Get("fnewmeta"))
+	if err != nil {
+		return suckhttp.NewResponse(400, "Bad Request"), err
+	}
+	if fid == "" || fnewmeta == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
+
+	// TODO: AUTH
 
 	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
-		Update:    bson.M{"$set": bson.M{"name": fnewname}},
+		Update:    bson.M{"$addToSet": bson.M{"metas": &meta{Type: fnewmetatype, Id: fid}}, "$currentDate": bson.M{"lastmodified": true}},
 		Upsert:    false,
 		ReturnNew: true,
 		Remove:    false,
 	}
 
-	var foo interface{}
-
-	_, err = conf.mgoColl.Find(query).Apply(change, &foo)
+	_, err = conf.mgoColl.Find(query).Apply(change, nil)
 	if err != nil {
 		if err == mgo.ErrNotFound {
-			return suckhttp.NewResponse(403, "Forbidden"), nil
+			return suckhttp.NewResponse(400, "Bad request"), nil
 		}
 		return nil, err
 	}
-
-	// if info.Updated != 1 {
-	// 	return suckhttp.NewResponse(403, "Forbidden"), nil
-	// }
 
 	return suckhttp.NewResponse(200, "OK"), nil
 }

@@ -14,19 +14,8 @@ type DeleteFolder struct {
 	mgoSession *mgo.Session
 	mgoColl    *mgo.Collection
 }
-type folder struct {
-	Id      string   `bson:"_id"`
-	RootsId []string `bson:"rootsid"`
-	Name    string   `bson:"name"`
-	Metas   []meta   `bson:"metas"`
-}
 
-type meta struct {
-	Type int    `bson:"metatype"`
-	Id   string `bson:"metaid"`
-}
-
-func NewDeleteFolder(mgoAddr string, mgoColl string) (*DeleteFolder, error) {
+func NewDeleteFolder(mgodb string, mgoAddr string, mgoColl string) (*DeleteFolder, error) {
 
 	mgoSession, err := mgo.Dial(mgoAddr)
 	if err != nil {
@@ -35,7 +24,7 @@ func NewDeleteFolder(mgoAddr string, mgoColl string) (*DeleteFolder, error) {
 	}
 	logger.Info("Mongo", "Connected!")
 
-	mgoCollection := mgoSession.DB("main").C(mgoColl)
+	mgoCollection := mgoSession.DB(mgodb).C(mgoColl)
 
 	return &DeleteFolder{mgoSession: mgoSession, mgoColl: mgoCollection}, nil
 
@@ -47,8 +36,6 @@ func (conf *DeleteFolder) Close() error {
 }
 
 func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhttp.Response, error) {
-
-	// TODO: AUTH
 
 	if !strings.Contains(r.GetHeader(suckhttp.Content_Type), "application/x-www-form-urlencoded") {
 		return suckhttp.NewResponse(400, "Bad request"), nil
@@ -63,32 +50,29 @@ func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 	if fid == "" {
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
+
+	// TODO: AUTH
+
 	// TODO: get metauser
 	metaid := "randmetaid"
 	//
 
-	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}, "$or": []bson.M{{"metas": &meta{Type: 0, Id: metaid}}, {"metas": &meta{Type: 1, Id: metaid}}}}
+	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
-		Update:    bson.M{"$set": bson.M{"deleted.bymeta": metaid}, "$currentDate": bson.M{"deleted.date": true}},
+		Update:    bson.M{"$set": bson.M{"deleted.bymeta": metaid}, "$currentDate": bson.M{"deleted.date": true, "lastmodified": true}},
 		Upsert:    false,
 		ReturnNew: true,
 		Remove:    false,
 	}
 
-	var foo interface{}
-
-	_, err = conf.mgoColl.Find(query).Apply(change, &foo)
+	_, err = conf.mgoColl.Find(query).Apply(change, nil)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			return suckhttp.NewResponse(403, "Forbidden"), nil
 		}
 		return nil, err
 	}
-
-	// if info.Updated != 1 {
-	// 	return suckhttp.NewResponse(403, "Forbidden"), nil
-	// }
 
 	return suckhttp.NewResponse(200, "OK"), nil
 }
