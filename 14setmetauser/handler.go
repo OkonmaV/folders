@@ -62,7 +62,7 @@ func (conf *SetMetaUser) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhtt
 	}
 
 	// TODO: AUTH
-
+	// lastmodified нафига нужен? с ним не получится узнать на выходе добавлен ли пользователь. Попробуй вместо $exsits заюзать $ne - вроде должно работать, это надежнее, если поле все-такие может содержать false...
 	query := &bson.M{"_id": fid, "deleted": bson.M{"$exists": false}}
 
 	change := mgo.Change{
@@ -72,13 +72,15 @@ func (conf *SetMetaUser) Handle(r *suckhttp.Request, l *logger.Logger) (*suckhtt
 		Remove:    false,
 	}
 
-	_, err = conf.mgoColl.Find(query).Apply(change, nil)
+	change_result, err = conf.mgoColl.Find(query).Apply(change, nil)
 	if err != nil {
 		if err == mgo.ErrNotFound {
 			return suckhttp.NewResponse(400, "Bad request"), nil
 		}
 		return nil, err
 	}
+	// Добавь проверку на измененность документа. В случае, если пользователь уже был добавлен, возвращаем 200 OK, а если добавился то 201 Created
+	if change_result.
 
 	return suckhttp.NewResponse(200, "OK"), nil
 }
