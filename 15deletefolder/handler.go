@@ -51,6 +51,11 @@ func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 		return suckhttp.NewResponse(400, "Bad request"), nil
 	}
 
+	// Проверка на метод, в данном случае DELETE
+	// folderid берем из урл /folderid
+	// Авторизация здесь вместе с получение ID-пользователя
+	// Нафига ты везде суешь lastmodified? Если хочешь делать историю изменений, это делается ваще не так... Убирай везде lastmodified
+
 	// TODO: AUTH
 
 	// TODO: get metauser
@@ -68,7 +73,7 @@ func (conf *DeleteFolder) Handle(r *suckhttp.Request, l *logger.Logger) (*suckht
 
 	_, err = conf.mgoColl.Find(query).Apply(change, nil)
 	if err != nil {
-		if err == mgo.ErrNotFound {
+		if err == mgo.ErrNotFound { // А ты уверен, что такое будет? Там же change возвращает количество найденных и количество обновленных
 			return suckhttp.NewResponse(403, "Forbidden"), nil
 		}
 		return nil, err
